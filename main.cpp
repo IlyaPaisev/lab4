@@ -1,299 +1,136 @@
 #include <iostream>
-#include <fstream>
-#include <format>
+#include <string>
+#include <unordered_map>
 #include <chrono>
 #include <vector>
-#include <queue>
-#include <unordered_map>
-#include <unordered_set>
-
-#include "Pipe.h"
-#include "CompressorStation.h"
-#include "Logging.h"
-#include "Get_Correct.cpp"
-#include "Graph.h"
+#include "inputcheck.h"
 #include "GasNetwork.h"
 
-using namespace std;
-using namespace chrono;
+using std::string;
+using std::cout;
+using std::cin;
+using std::endl;
+using std::unordered_map;
 
-template<typename T1, typename T2>
-using filter = bool(*)(const T1& dict, T2 param);
 
-template<typename T>
-bool filter_by_name(const T& dict, string name) {
-    return dict.name.find(name) != string::npos;
-}
 
-bool filter_by_status(const Pipe& dict, bool status) {
-    return dict.under_repair == status;
-}
+void printHelp()
+{
+	cout << "Instructions:" << endl << endl;
+	cout << "1 - Add a pipe" << endl;
+	cout << "2 - Add CS" << endl;
+	cout << "3 - Actions with pipes" << endl;
+	cout << "4 - Actions with CS" << endl;
+	cout << "5 - View all pipes and CS" << endl;
+	cout << "6 - Create connection (add to gas pipeline)" << endl;
+	cout << "7 - Show the entire gas pipeline" << endl;
+	cout << "8 - Delete connection" << endl;
+	cout << "9 - Topological sorting" << endl;
+	cout << "10 - Find the shortest path" << endl;
+	cout << "11 - Find the maximum flow in the network" << endl;
+	cout << "12 - Save" << endl;
+	cout << "13 - Upload" << endl;
 
-bool filter_by_non_working(const CompressorStation& dict, int non_working) {
-    return dict.num_workshops - dict.num_workshops_in_operation >= dict.num_workshops * non_working / 100;
-}
-
-template <typename T1, typename T2>
-unordered_set<int> find_by_filter(const unordered_map<int, T1>& dict, filter<T1, T2> f, T2 par) {
-    unordered_set<int> ids;
-    for (auto& pair : dict) {
-        if (f(pair.second, par)) {
-            ids.insert(pair.first);
-        }
-    }
-    return ids;
-}
-
-template <typename F>
-void display_id(unordered_map<int, F> dict, int id) {
-    for (auto const& pair : dict) {
-        if (id == pair.first) {
-            cout << pair.second << endl;
-        }
-    }
-}
-
-template <typename T>
-void edit_multiple_items(unordered_map<int, T> dict, const unordered_set<int>& ids) {
-    for (int id : ids) {
-        cout << "Are you sure you want to edit the pipe:\n";
-        display_id(dict, id);
-        cout << "0-No 1-Yes\n";
-        if(get_correct_value(0, 1)){
-            T& item = dict[id];
-            item.toggle_repair();
-        }
-    }
-    cout << "Editing completed for the selected items." << endl;
-}
-
-template <typename T>
-void delete_multiple_items(unordered_map<int, T> dict, const unordered_set<int>& ids) {
-    for (int id : ids) {
-        cout << "Are you sure you want to delete the pipe:\n";
-        display_id(dict, id);
-        cout << "0-No 1-Yes\n";
-        if(get_correct_value(0, 1)){
-            dict.erase(id);
-        }
-    }
-    cout << "Deletion completed for the selected items." << endl;
+	cout << "0 - Exit" << endl << endl;
 }
 
 
-void filter_by_pipes(GasNetwork net){
-    if (net.getpipes().size() != 0){
-        cout << "0 - By the 'under repair' status \n1 - By pipe name\nChoose by which filter you want to filter: ";
-        if (get_correct_value(0, 1)) {
-            cout << "Enter the name of the pipes you want to find: ";
-            string name = get_str();
-            for (int i : find_by_filter(net.getpipes(), filter_by_name, name)) {
-                display_id(net.getpipes(), i);
-            }
-        }else {
-            cout << "0 - pipe not under repair\n1 - pipe under repair\nEnter the number: ";
-            bool under_repair = get_correct_value(0, 1);
-            for (int i : find_by_filter(net.getpipes(), filter_by_status, under_repair)) {
-                display_id(net.getpipes(), i);
-            }
-        }
-    }else{
-        cout << "No data\n";
-    }
-}
+int main()
+{
+	setlocale(LC_ALL, "ru");
 
-void filter_by_cs(GasNetwork net){
-    if(net.getcs().size() != 0){
-        cout << "0 - By the percentage of unused workshops\n1- By the name of compressor stations\nChoose by which filter you want to filter: ";
-        if (get_correct_value(0, 1)) {
-            cout << "Enter the name of the compressor station you want to find: ";
-            string name = get_str();
-            for (int i : find_by_filter(net.getcs(), filter_by_name, name)) {
-                display_id(net.getcs(), i);
-            }
-        }else {
-            cout << "Enter the efficiency of the compressor stations you want to find: ";
-            int non_working = get_correct_value(0, 100);
-            for (int i : find_by_filter(net.getcs(), filter_by_non_working, non_working)) {
-                display_id(net.getcs(), i);
-            }
-        }
-    }else{
-        cout << "No data\n";
-    }
-}
+	RedirectOutputWrapper cerrOut(std::cerr);
+	string time = std::format("{:%d_%m_%Y_%H_%M_%OS}",std::chrono::system_clock::now());
+	std::ofstream logfile("logs\\log_" + time + ".txt");
 
-void batch_editing_pipes(GasNetwork net){
-    if (net.getpipes().size() != 0){
-        cout << "0 - By 'under repair' status\n1 - By pipe name\nChoose the criterion for selecting pipes for batch editing: ";
-        int filter_choice = get_correct_value<int>(0, 1);
-        
-        if (filter_choice == 0) {
-            cout << "0 - Not under repair\n1 - Under repair\nChoose the pipe status: ";
-            bool under_repair = get_correct_value(0, 1);
-            unordered_set<int> selected_pipes = find_by_filter(net.getpipes(), filter_by_status, under_repair);
-            edit_multiple_items(net.getpipes(), selected_pipes);
-        } else if (filter_choice == 1) {
-            cout << "Enter the pipe name for search: ";
-            string name = get_str();
-            unordered_set<int> selected_pipes = find_by_filter(net.getpipes(), filter_by_name, name);
-            edit_multiple_items(net.getpipes(), selected_pipes);
-        }
-    }else{
-        cout << "No data\n";
-    }
-}
+	if (logfile)
+		cerrOut.redirect(logfile);
 
-void batch_deletion_pipes(GasNetwork net){
-    if (net.getpipes().size() != 0){
-        cout << "0 - By 'under repair' status\n1 - By pipe name\nChoose the criterion for selecting pipes for batch deletion: ";
-        int filter_choice = get_correct_value<int>(0, 1);
-        
-        if (filter_choice == 0) {
-            cout << "0 - Not under repair\n1 - Under repair\nChoose the pipe status: ";
-            bool under_repair = get_correct_value(0, 1);
-            unordered_set<int> selected_pipes = find_by_filter(net.getpipes(), filter_by_status, under_repair);
-            delete_multiple_items(net.getpipes(), selected_pipes);
-        } else if (filter_choice == 1) {
-            cout << "Enter the pipe name for search: ";
-            string name = get_str();
-            unordered_set<int> selected_pipes = find_by_filter(net.getpipes(), filter_by_name, name);
-            delete_multiple_items(net.getpipes(), selected_pipes);
-        }
-    }else{
-        cout << "No data\n";
-    }
-}
+	printHelp();
 
-int main() {
-    redirect_output_wrapper cerr_out(cerr);
-    ofstream logfile("log.txt");
-    if (logfile) {
-        cerr_out.redirect(logfile);
-    }
-    
-    GasNetwork net;
-    
-    while (true) {
-        net.print_menu();
+	int choice;
 
-        int choice;
-        cout << "\nEnter a number from 0 to 17 to perform the corresponding action: ";
-        choice = get_correct_value<int>(0, 17);
-        switch (choice) {
-            case 0:
-                exit(0);
-                break;
-            case 1: {
-                Pipe pipe;
-                net.add_pipe(pipe);
-                break;
-            }
-            case 2: {
-                CompressorStation station;
-                net.add_station(station);
-                break;
-            }
-            case 3: {
-                net.print_pipe_and_cs();
-                break;
-            }
-            case 4: {
-                net.edit_pipe();
-                break;
-            }
-            case 5: {
-                net.edit_cs();
-                break;
-            }
-            case 6: {
-                net.save_file();
-                break;
-            }
-            case 7: {
-                net.load_file();
-                break;
-            }
-            case 8: {
-                net.delete_pipe();
-                break;
-            }
-            case 9: {
-                net.delete_cs();
-                break;
-            }
-            case 10:{
-                filter_by_pipes(net);
-                break;
-            }
-            case 11:{
-                filter_by_cs(net);
-                break;
-            }
-            case 12: {
-                batch_editing_pipes(net);
-                break;
-            }
-            case 13: {
-                batch_deletion_pipes(net);
-                break;
-            }
-            case 14: {
-                net.connectPipesToStations();
-                break;
-            }
-            case 15: {
-                Graph gasGraph = buildGraph(net.getpipes(), net.getcs());
+	unordered_map<int, CS> mapCS;
+	unordered_map<int, Pipe> mapPipe;
+	std::vector<Connection> arrConnection;
+	
+	while (true)
+	{
+		cout << "Enter the number: ";
+		checkInput(choice, 0, 13);
 
-                std::vector<int> sortedNodes = topologicalSort(gasGraph);
-                if (sortedNodes.size() != net.getcs().size()){
-                    cout << "There is a cycle in the graph" << endl;
-                }else{
-                    cout << "Topological sorting result:" << endl;
-                    for (int node : sortedNodes) {
-                        std::cout << node << " ";
-                    }
-                    cout << endl;
-                }
-                break;
-            }
-            case 16: {
-                Graph gasGraph = buildGraph(net.getpipes(), net.getcs());
-                
-                int sourceID = get_valid_id("Enter source vertex ID: ", net.getcs());
-                int sinkID = get_valid_id("Enter sink vertex ID: ", net.getcs());
+		system("cls");
 
-                double maxFlow = fordFulkerson(gasGraph, sourceID, sinkID);
-                cout << "Maximum flow: " << maxFlow << endl;
-                break;
-            }
-            case 17: {
-                Graph gasGraph = buildGraph(net.getpipes(), net.getcs());
-                
-                int startStation = get_valid_id("Enter the ID of the initial compressor station: ", net.getcs());
-                int endStation = get_valid_id("Enter the ID of the final compressor station: ", net.getcs());
+		switch (choice)
+		{
+		case 1:
+			addPipe(mapPipe);
+			break;
 
-                std::vector<int> path = shortestPath(gasGraph, startStation, endStation);
+		case 2:
+			addCS(mapCS);
+			break;
 
-                if (path.empty()) {
-                    cout << "The shortest path between the stations has not been found." << endl;
-                } else {
-                    cout << "The shortest way: ";
-                    for (size_t i = 0; i < path.size(); ++i) {
-                        cout << path[i];
-                        if (i != path.size() - 1) {
-                            cout << " -> ";
-                        }
-                    }
-                    cout << endl;
-                }
-                break;
-            }   
-            default: {
-                cerr << "Invalid choice. Please try again.\n";
-                break;
-            }
-        }
-    }
-    return 0;
+		case 3:
+			chooseAction(mapPipe);
+			break;
+
+		case 4:
+			chooseAction(mapCS);
+			break;
+
+		case 5:
+			printAll(mapPipe, mapCS);
+			break;
+
+		case 6:
+			addConnection(arrConnection, mapPipe, mapCS);
+			break;
+		
+		case 7:
+			printConnection(arrConnection, mapPipe);
+			break;
+
+		case 8:
+			deleteConnection(arrConnection, mapPipe, mapCS);
+			break;
+
+		case 9:
+			printConnection(arrConnection, mapPipe);
+			topologicalSort(arrConnection, mapPipe);
+			break;
+
+		case 10:
+			printConnection(arrConnection, mapPipe);
+			findShortestPath(arrConnection, mapPipe);
+			break;
+
+		case 11:
+			printConnection(arrConnection, mapPipe);
+			findMaxFlow(arrConnection, mapPipe);
+			break;
+
+		case 12:
+			saveObjects(mapPipe, mapCS, arrConnection);
+			break;
+
+		case 13:
+			loadObjects(mapPipe, mapCS, arrConnection);
+			break;
+
+		case 0:
+			cout << "See you soon!" << endl;
+			return 0;
+		}
+
+		cout << "Press Enter...";
+
+		cin.ignore(10000, '\n');
+		std::cerr << endl;
+		system("cls");
+
+		printHelp();
+	}
+
+	return 0;
 }
