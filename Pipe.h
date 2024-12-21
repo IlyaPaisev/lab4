@@ -1,28 +1,46 @@
 #pragma once
+#include <iostream>
+#include <string>
 #include <fstream>
 
-class Pipe {
-private:
-    int id;
-    static int Nextid;
-    int id_cs_of_the_entrance;
-    int id_cs_of_the_exit;
+#include "inputcheck.h"
 
+const std::vector<int> pipeDiameters = { 500, 700, 1000, 1400 };
+
+class Pipe
+{
 public:
-    inline int getid() const { return id; };
-    inline int getIdCSOfTheEntrance() const { return id_cs_of_the_entrance; };
-    inline int getIdCSOfTheExit() const { return id_cs_of_the_exit; };
-    
-    std::string name;
-    int length;
-    int diameter;
-    bool under_repair;
+	static int idCount;
+	bool isInConnection = false;
 
-    Pipe();
-    void read();
-    void toggle_repair();
-    void connecting_with_cs(int id_from, int id_to);
-    void save_data(std::ofstream& out);
-    void load_data(std::ifstream& read);
-    friend std::ostream& operator << (std::ostream& out, const Pipe& p);
+	int getID();
+	float getLength() const;
+	int getDiameter() const;
+	int getStatus() const;
+
+	friend void editPipe(Pipe& p);
+	friend void createPipeWithGivenDiameter(Pipe& p, int diameter);
+	friend bool filtByName(const Pipe& p, std::string name);
+	friend bool filtByRepairingFlag(const Pipe& p, bool type);
+	friend bool filtByDiameter(const Pipe& p, int d);
+
+	friend std::istream& operator >> (std::istream& in, Pipe& p);
+	friend std::ostream& operator << (std::ostream& out, const Pipe& p);
+	friend std::ifstream& operator >> (std::ifstream& in, Pipe& p);
+	friend std::ofstream& operator << (std::ofstream& out, const Pipe& p);
+
+private:
+
+	int id;
+	std::string kmMark;
+	float length;
+	int diameter;
+	bool isUnderRepair;
 };
+
+void editPipe(Pipe& p);
+void createPipeWithGivenDiameter(Pipe& p, int diameter);
+
+bool filtByName(const Pipe& p, std::string name);
+bool filtByRepairingFlag(const Pipe& p, bool type);
+bool filtByDiameter(const Pipe& p, int d);
